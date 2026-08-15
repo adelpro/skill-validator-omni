@@ -83,6 +83,12 @@ export function parseSimpleYaml(text) {
 }
 
 export const SCHEMA_URL = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
+export const AGENT_PLUGINS_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json';
+export const AGENT_PLUGINS_MCP_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json';
+const AGENT_PLUGINS_ALLOWED_FIELDS = new Set([
+  '$schema', 'name', 'version', 'description', 'author', 'homepage',
+  'repository', 'license', 'keywords', 'extensions',
+]);
 
 const AGENT_SKILL_DIRS = [
   '.claude/skills',
@@ -362,6 +368,103 @@ export async function validate(root) {
       ok: true,
       detail: 'no .claude-plugin/.claude dirs — Claude layout not claimed (ok for local/Hermes skills)',
     });
+  }
+
+  // --- Agent Plugins 1.0.0 (agent-plugins.org, vendor-neutral spec) ---
+  // A plugin dir contains plugin.json at its root. Check the repo root and
+  // nested plugin dirs (up to 2 levels), like the Claude plugin scan above.
+  const apPluginDirs = [];
+  if (await isFile(join(root, 'plugin.json'))) apPluginDirs.push(root);
+  for (const entry of await readdir(root, { withFileTypes: true }).catch(() => [])) {
+    if (!entry.isDirectory()) continue;
+    if (await isFile(join(root, entry.name, 'plugin.json'))) {
+      apPluginDirs.push(join(root, entry.name));
+    } else {
+      for (const sub of await readdir(join(root, entry.name), { withFileTypes: true }).catch(() => [])) {
+        if (sub.isDirectory() && await isFile(join(root, entry.name, sub.name, 'plugin.json'))) {
+          apPluginDirs.push(join(root, entry.name, sub.name));
+        }
+      }
+    }
+  }
+
+  if (apPluginDirs.length === 0) {
+    checks.push({
+      name: 'agentplugins: no plugin.json manifest',
+      ok: true,
+      detail: 'not packaged as an Agent Plugin — spec claims not made (ok for plain skill repos)',
+    });
+  }
+
+  for (const pd of apPluginDirs) {
+    const label = pd === root ? 'agentplugins' : `agentplugins: ${relative(root, pd)}`;
+    const pjPath = join(pd, 'plugin.json');
+    let pjContent;
+    try {
+      pjContent = await readFile(pjPath, 'utf8');
+    } catch {
+      checks.push({ name: `${label}: manifest readable`, ok: false, detail: pjPath });
+      continue;
+    }
+    let manifest;
+    try {
+      manifest = JSON.parse(pjContent);
+      checks.push({ name: `${label}: manifest valid JSON`, ok: true });
+    } catch (e) {
+      checks.push({ name: `${label}: manifest valid JSON`, ok: false, detail: e.message });
+      continue;
+    }
+    checks.push({
+      name: `${label}: $schema declares Agent Plugins`,
+      ok: manifest.$schema === AGENT_PLUGINS_SCHEMA,
+      detail: manifest.$schema ?? '(missing)',
+    });
+    const pname = String(manifest.name ?? '');
+    const nameOk = pname.length >= 1 && pname.length <= 64 &&
+      /^(?!.*--)(?!.*\.\.)[a-z0-9][a-z0-9.-]*[a-z0-9]$/.test(pname);
+    checks.push({
+      name: `${label}: name format`,
+      ok: nameOk,
+      detail: "1-64 chars, lowercase alnum/hyphen/dot, no '--', no '..', alnum ends",
+    });
+    const unknown = Object.keys(manifest).filter((k) => !AGENT_PLUGINS_ALLOWED_FIELDS.has(k));
+    checks.push({
+      name: `${label}: no unknown top-level fields (closed schema)`,
+      ok: unknown.length === 0,
+      detail: unknown.slice(0, 3).join(', ') || 'all fields allowed',
+    });
+    if ('keywords' in manifest) {
+      checks.push({ name: `${label}: keywords is array`, ok: Array.isArray(manifest.keywords) });
+    }
+    if ('author' in manifest && manifest.author !== null) {
+      checks.push({ name: `${label}: author is object`, ok: typeof manifest.author === 'object' && !Array.isArray(manifest.author) });
+    }
+    // skills/ dir: immediate children with SKILL.md (Agent Plugins layout).
+    // Missing skills/ is valid (MCP-only plugin); existing-as-file is not.
+    const pluginSkills = await walkForSkillMds(join(pd, 'skills'), 1);
+    const skillsDirPath = join(pd, 'skills');
+    const skillsIsDir = await readdir(skillsDirPath, { withFileTypes: true }).then(() => true).catch(() => false);
+    const skillsIsFile = skillsIsDir ? false : await isFile(skillsDirPath);
+    checks.push({
+      name: `${label}: skills/ layout`,
+      ok: !skillsIsFile,
+      detail: skillsIsDir
+        ? `${pluginSkills.length} skill(s) in skills/ (immediate children)`
+        : skillsIsFile
+          ? 'skills/ exists but is not a directory (skills component invalid)'
+          : 'no skills/ dir (valid — MCP-only plugin)',
+    });
+    // mcp.json: optional, must parse as JSON object
+    const mcpPath = join(pd, 'mcp.json');
+    const mcpContent = await readFile(mcpPath, 'utf8').catch(() => null);
+    if (mcpContent !== null) {
+      try {
+        const mcp = JSON.parse(mcpContent);
+        checks.push({ name: `${label}: mcp.json valid JSON`, ok: typeof mcp === 'object' && !Array.isArray(mcp) });
+      } catch (e) {
+        checks.push({ name: `${label}: mcp.json valid JSON`, ok: false, detail: e.message });
+      }
+    }
   }
 
   return checks;

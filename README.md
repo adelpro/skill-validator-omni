@@ -3,11 +3,17 @@
 Validate agent skills against **multiple standards in one command** — the
 compliance gate for the agent skills ecosystem.
 
+Flagship standard: **Agent Plugins 1.0.0** (agent-plugins.org) — the open,
+vendor-neutral specification for packaging Agent Skills and MCP servers into
+portable plugins, published by a Technical Steering Committee of Core
+Maintainers from **Amazon, Cursor, Microsoft, OpenAI, and Vercel**.
+
 Unlike creation tools (`skill-creator` et al.) and single-spec validators
 (`skills-ref`, which checks only the agentskills.io spec), `skill-validator`
 checks a skill or repo against the full set of standards that actually gate
 whether a skill installs and works across agents:
 
+- **Agent Plugins 1.0.0** — `plugin.json` manifest against the canonical schema ($schema, name constraints, closed field set), `skills/` layout, optional `mcp.json`
 - **agentskills.io spec** — name/dir rules, description length, compatibility ≤500, allowed-tools
 - **Anthropic best practices** — third-person descriptions, progressive disclosure, <500-line bodies
 - **Hermes in-repo standard** — frontmatter fields, section structure, ≤60-char descriptions
@@ -63,6 +69,7 @@ npx skill-validator-cli ./my-skills-repo
 
 Discovery follows the same layouts the ecosystem actually installs from:
 
+- `plugin.json` at the repo root (Agent Plugins package) with the canonical `$schema: https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`
 - `SKILL.md` at the repo root (single-skill repo)
 - `skills/<name>/SKILL.md`, walked up to 3 levels (`skills/<category>/<skill>/SKILL.md`)
 - agent dirs: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.codex/skills/`, `.gemini/skills/`, `.config/opencode/skills/`
@@ -70,7 +77,8 @@ Discovery follows the same layouts the ecosystem actually installs from:
 - `.claude-plugin/marketplace.json` + `<plugin>/.claude-plugin/plugin.json` + `<plugin>/skills/`
 
 Every discovered skill gets the full spec + Anthropic + Hermes check suite,
-so a broken skill nested inside a big repo can't hide.
+so a broken skill nested inside a big repo can't hide. Agent Plugins manifests
+are checked against the spec's closed field set and name constraints.
 
 ## Examples
 

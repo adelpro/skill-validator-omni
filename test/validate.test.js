@@ -145,3 +145,55 @@ metadata:
   assert.deepEqual(fm.metadata.hermes.tags, ['skills', 'validation']);
   assert.equal(fm.metadata.hermes.enabled, true);
 });
+
+test('agent plugins: valid plugin passes', async () => {
+  const root = await makeRepo({
+    'plugin.json': JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'acme.tools',
+      version: '1.0.0',
+      description: 'Demo plugin',
+      license: 'MIT',
+      keywords: ['tools'],
+    }),
+    'skills/deploy/SKILL.md': GOOD_SKILL,
+  });
+  try {
+    const checks = await validate(root);
+    const failed = checks.filter((c) => c.name.startsWith('agentplugins') && !c.ok);
+    assert.equal(failed.length, 0, JSON.stringify(failed, null, 2));
+    assert.ok(checks.some((c) => c.name === 'agentplugins: $schema declares Agent Plugins' && c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('agent plugins: bad name and missing $schema fail', async () => {
+  const root = await makeRepo({
+    'plugin.json': JSON.stringify({ name: 'My--Plugin', customField: 1 }),
+  });
+  try {
+    const checks = await validate(root);
+    assert.ok(checks.some((c) => c.name === 'agentplugins: $schema declares Agent Plugins' && !c.ok));
+    assert.ok(checks.some((c) => c.name === 'agentplugins: name format' && !c.ok));
+    assert.ok(checks.some((c) => c.name === 'agentplugins: no unknown top-level fields (closed schema)' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('agent plugins: mcp.json invalid fails', async () => {
+  const root = await makeRepo({
+    'plugin.json': JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'acme.tools',
+    }),
+    'mcp.json': '{bad json',
+  });
+  try {
+    const checks = await validate(root);
+    assert.ok(checks.some((c) => c.name === 'agentplugins: mcp.json valid JSON' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
