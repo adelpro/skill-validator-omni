@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "skill.validator",
+  "version": "1.1.0",
+  "description": "Multi-standard validator for agent skills and plugins",
+  "author": {
+    "name": "Adel Ben Yahia"
+  },
+  "homepage": "https://github.com/adelpro/skill-validator",
+  "repository": "https://github.com/adelpro/skill-validator",
+  "license": "MIT",
+  "keywords": ["skills", "validation", "agentskills", "agent-plugins", "cli"]
+}

@@ -1,44 +1,66 @@
 # skill-validator
 
-Validate agent skills against **multiple standards in one command** — the
-compliance gate for the agent skills ecosystem.
+One command validates an agent skill or plugin against every standard that gates whether it installs and works across agents. The flagship check is **Agent Plugins 1.0.0** (agent-plugins.org), the vendor-neutral spec for packaging Agent Skills and MCP servers into portable plugins, published by a Technical Steering Committee from Amazon, Cursor, Microsoft, OpenAI, and Vercel.
 
-Flagship standard: **Agent Plugins 1.0.0** (agent-plugins.org) — the open,
-vendor-neutral specification for packaging Agent Skills and MCP servers into
-portable plugins, published by a Technical Steering Committee of Core
-Maintainers from **Amazon, Cursor, Microsoft, OpenAI, and Vercel**.
+Other validators cover one spec. `skills-ref` checks only agentskills.io. Creation tools like `skill-creator` produce skills without certifying them. This tool checks the full set:
 
-Unlike creation tools (`skill-creator` et al.) and single-spec validators
-(`skills-ref`, which checks only the agentskills.io spec), `skill-validator`
-checks a skill or repo against the full set of standards that actually gate
-whether a skill installs and works across agents:
+- **Agent Plugins 1.0.0**: `plugin.json` manifest ($schema, name constraints, closed field set), `skills/` layout, optional `mcp.json`
+- **agentskills.io spec**: name/dir rules, description length, compatibility <=500, allowed-tools
+- **Anthropic best practices**: third-person descriptions, progressive disclosure, bodies under 500 lines
+- **Hermes in-repo standard**: frontmatter fields, section structure, descriptions under 60 chars
+- **OpenAgent skills.sh ecosystem**: `npx skills add` discoverable layout, well-known index schema
+- **Claude Code**: plugin marketplace layout, plugin manifests, project `.claude/skills/`
 
-- **Agent Plugins 1.0.0** — `plugin.json` manifest against the canonical schema ($schema, name constraints, closed field set), `skills/` layout, optional `mcp.json`
-- **agentskills.io spec** — name/dir rules, description length, compatibility ≤500, allowed-tools
-- **Anthropic best practices** — third-person descriptions, progressive disclosure, <500-line bodies
-- **Hermes in-repo standard** — frontmatter fields, section structure, ≤60-char descriptions
-- **OpenAgent skills.sh ecosystem** — `npx skills add <owner/repo>` discoverable layout, well-known index schema
-- **Claude Code** — plugin marketplace layout, plugin manifests, project `.claude/skills/`
+Needs only Node >=18. No Python, no PyYAML.
 
-## Install
+## Install into agents
+
+The repo is packaged for every install path at once. Pick the one for your agent.
+
+**Claude Code**
+
+```bash
+/plugin marketplace add adelpro/skill-validator
+/plugin install skill-validator@adelpro-skill-validator
+```
+
+**Any agent via the skills.sh CLI**
+
+```bash
+# preview what's in the repo
+npx skills add adelpro/skill-validator -l
+
+# install into specific agents (claude-code, hermes-agent, codex, cursor, ...)
+npx skills add adelpro/skill-validator -a claude-code -a hermes-agent --copy -y
+```
+
+**Hermes Agent**
+
+```bash
+npx skills add adelpro/skill-validator -s skill-validator -a hermes-agent --copy -y
+```
+
+**Agent Plugins clients**
+
+The repo root is itself an Agent Plugins package (`plugin.json` with the canonical `$schema`), so compatible clients can load `skills/` and `mcp.json` directly.
+
+**The CLI itself (validation without installing the skill)**
 
 ```bash
 npx skill-validator-cli <dir>
+npm i -g skill-validator-cli   # optional global install
 ```
-
-Zero install required (`npx` fetches it). Needs only Node ≥18 — no Python,
-no PyYAML. Can also be installed globally: `npm i -g skill-validator-cli`.
 
 ## Usage
 
 ```bash
-# Human report — exit 0 = all checks pass
+# Human report. Exit 0 = all checks pass.
 npx skill-validator-cli ./my-skill
 
-# JSON report for CI pipelines
+# JSON report for CI pipelines.
 npx skill-validator-cli ./my-skill --json
 
-# Validate a whole repo (discovers every skill under skills/, agent dirs)
+# Validate a whole repo. Discovers every skill under skills/ and agent dirs.
 npx skill-validator-cli ./my-skills-repo
 ```
 
@@ -55,7 +77,7 @@ npx skill-validator-cli ./my-skills-repo
 ```json
 {
   "tool": "skill-validator-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "target": "./my-skill",
   "passed": 27,
   "failed": 0,
@@ -67,7 +89,7 @@ npx skill-validator-cli ./my-skills-repo
 
 ## What gets validated
 
-Discovery follows the same layouts the ecosystem actually installs from:
+Discovery follows the layouts the ecosystem actually installs from:
 
 - `plugin.json` at the repo root (Agent Plugins package) with the canonical `$schema: https://agent-plugins.org/schemas/1.0.0/plugin.schema.json`
 - `SKILL.md` at the repo root (single-skill repo)
@@ -76,9 +98,7 @@ Discovery follows the same layouts the ecosystem actually installs from:
 - `.well-known/agent-skills/index.json` with `$schema: https://schemas.agentskills.io/discovery/0.2.0/schema.json`
 - `.claude-plugin/marketplace.json` + `<plugin>/.claude-plugin/plugin.json` + `<plugin>/skills/`
 
-Every discovered skill gets the full spec + Anthropic + Hermes check suite,
-so a broken skill nested inside a big repo can't hide. Agent Plugins manifests
-are checked against the spec's closed field set and name constraints.
+Every skill found in a repo gets the full check suite. A broken skill nested inside a big repo can't hide. Agent Plugins manifests are checked against the spec's closed field set and name constraints.
 
 ## Examples
 
@@ -87,7 +107,7 @@ are checked against the spec's closed field set and name constraints.
 $ npx skill-validator-cli ./my-skill
 27/27 checks passed
 
-# A broken one — fails fast, tells you why
+# A broken one. Fails fast, tells you why.
 $ npx skill-validator-cli ./my-skill
   [FAIL] spec: name == directory  ('My-Skill' vs dir 'my-skill')
   [FAIL] hermes: description <= 60  (73 chars)
@@ -100,11 +120,24 @@ $ npx skill-validator-cli ./my-skill
 npx skill-validator-cli . --json | jq -e '.ok'
 ```
 
+## Layout
+
+```
+skill-validator/
+├── bin/cli.js                  CLI entry
+├── src/validate.js             the validator (library + standalone entry)
+├── test/                       node --test suite
+├── plugin.json                 Agent Plugins 1.0.0 manifest (self-validating)
+├── .claude-plugin/             Claude Code marketplace + plugin manifests
+└── skills/skill-validator/     the Hermes skill (SKILL.md + scripts + references)
+```
+
 ## Related
 
-- [`skills-ref`](https://github.com/agentskills/agentskills) — validates the agentskills.io spec only
-- [`skill-creator`](https://github.com/anthropics/skills) — creates skills (single standard)
-- `skill-engineer` (Hermes) — multi-agent quality review; pair it with this tool for the subjective half
+- [agent-plugins.org](https://agent-plugins.org): the flagship standard
+- [agentskills.io](https://agentskills.io): the Agent Skills spec
+- [`skills-ref`](https://github.com/agentskills/agentskills): validates the agentskills.io spec only
+- [`skill-creator`](https://github.com/anthropics/skills): creates skills
 
 ## License
 
