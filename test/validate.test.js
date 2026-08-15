@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validate } from '../src/validate.js';
+import { validate, parseSimpleYaml } from '../src/validate.js';
 
 const GOOD_SKILL = `---
 name: demo-skill
@@ -118,4 +118,30 @@ test('empty dir reports no skills', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('parseSimpleYaml handles scalars, inline lists, nested maps, block lists', () => {
+  const fm = parseSimpleYaml(`name: demo-skill
+description: "Has a: colon and stuff."
+version: 0.1.0
+platforms: [linux, macos, windows]
+allowed-tools: Bash(git:*) Read
+metadata:
+  author: Test Author
+  version: "1.0"
+  hermes:
+    tags:
+      - skills
+      - validation
+    enabled: true
+`);
+  assert.equal(fm.name, 'demo-skill');
+  assert.equal(fm.description, 'Has a: colon and stuff.');
+  assert.equal(fm.version, '0.1.0');
+  assert.deepEqual(fm.platforms, ['linux', 'macos', 'windows']);
+  assert.equal(fm['allowed-tools'], 'Bash(git:*) Read');
+  assert.equal(fm.metadata.author, 'Test Author');
+  assert.equal(fm.metadata.version, '1.0');
+  assert.deepEqual(fm.metadata.hermes.tags, ['skills', 'validation']);
+  assert.equal(fm.metadata.hermes.enabled, true);
 });

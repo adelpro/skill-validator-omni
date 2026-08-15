@@ -7,7 +7,80 @@
 // (the Hermes skill keeps a synced copy under scripts/validate.js)
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+
+// Prefer the `yaml` package when resolvable; fall back to a built-in parser
+// for the SKILL.md frontmatter subset so the script runs with zero setup.
+let parseYaml;
+try {
+  const yamlMod = await import('yaml');
+  parseYaml = (s) => yamlMod.parse(s);
+} catch {
+  parseYaml = parseSimpleYaml;
+}
+
+// Minimal YAML parser for SKILL.md frontmatter: scalar keys, inline lists,
+// nested maps via indentation, `key:` + `- item` block lists, quoted,
+// boolean, and number values. Fallback when the `yaml` package is absent.
+export function parseSimpleYaml(text) {
+  const lines = text.split('\n');
+  const root = {};
+  const stack = [{ indent: -1, obj: root }];
+  const unquote = (v) => {
+    v = v.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      return v.slice(1, -1);
+    }
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    if (/^-?\d+$/.test(v)) return Number(v);
+    return v;
+  };
+  const clean = (raw) => {
+    const line = raw.replace(/#.*$/, '').trimEnd();
+    return line.trim() && !line.trim().startsWith('#') ? line : null;
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = clean(lines[i]);
+    i += 1;
+    if (line === null) continue;
+    const indent = line.match(/^ */)[0].length;
+    const content = line.trim();
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+    const { obj } = stack[stack.length - 1];
+    const m = content.match(/^([A-Za-z0-9_.-]+):\s*(.*)$/);
+    if (!m) continue;
+    const key = m[1];
+    const val = m[2].trim();
+    if (val === '') {
+      // Lookahead: block list (`- item`) or nested map?
+      const next = clean(lines[i]);
+      const nextIndent = next ? next.match(/^ */)[0].length : -1;
+      if (next && next.trim().startsWith('- ') && nextIndent > indent) {
+        const list = [];
+        while (i < lines.length) {
+          const item = clean(lines[i]);
+          if (!item || item.match(/^ */)[0].length !== nextIndent) break;
+          if (!item.trim().startsWith('- ')) break;
+          list.push(unquote(item.trim().slice(2)));
+          i += 1;
+        }
+        obj[key] = list;
+      } else {
+        const nextObj = {};
+        obj[key] = nextObj;
+        stack.push({ indent, obj: nextObj });
+      }
+      continue;
+    }
+    if (val.startsWith('[') && val.endsWith(']')) {
+      obj[key] = val.slice(1, -1).split(',').map((s) => unquote(s)).filter((s) => s !== '');
+      continue;
+    }
+    obj[key] = unquote(val);
+  }
+  return root;
+}
 
 export const SCHEMA_URL = 'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
 
@@ -292,4 +365,23 @@ export async function validate(root) {
   }
 
   return checks;
+}
+
+// CLI entry when run directly: `node validate.js <dir>` (library otherwise)
+const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) {
+  const dir = process.argv[2];
+  if (!dir) {
+    console.error('usage: node validate.js <dir>');
+    process.exit(2);
+  }
+  const checks = await validate(dir);
+  const failed = checks.filter((c) => !c.ok);
+  console.log(`Validating: ${dir}`);
+  for (const c of checks) {
+    const mark = c.ok ? 'PASS' : 'FAIL';
+    console.log(`  [${mark}] ${c.name}${c.detail ? `  (${c.detail})` : ''}`);
+  }
+  console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+  process.exit(failed.length === 0 ? 0 : 1);
 }
