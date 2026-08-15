@@ -1,14 +1,14 @@
 ---
 name: skill-validator
 description: Validates skills against authoring standards. Use to audit.
-version: 2.1.0
+version: 2.2.0
 author: Adel Ben Yahia (adelpro)
 license: MIT
 platforms: [linux, macos, windows]
 compatibility: Requires Node.js 18+ (yaml package installed via npm).
 metadata:
   author: Adel Ben Yahia (adelpro)
-  version: 2.1.0
+  version: 2.2.0
   hermes:
     tags: [skills, validation, standards, audit, cli]
     related_skills: [skill-engineer, hermes-agent-skill-authoring, publishing-skills]
@@ -90,7 +90,8 @@ A skill project passes install checks when it satisfies at least one discoverabl
 
 ## Verification
 
-- `npx skill-validator-cli <dir>` exits 0 with no failures on a compliant skill
+- `npx skill-validator-cli <dir>` exits 0 with no failures on a compliant skill; report ends with per-standard scores (`[PASS] Agent Plugins 1.0.0: 7/7` etc.)
+- JSON mode carries a `standards` array (one object per standard: passed/failed/total/ok) for per-standard CI gating: `jq -e '.standards["Agent Plugins 1.0.0"].ok'`
 - `node scripts/validate.js <dir>` on this skill directory passes all checks
 - Repo test suite green: `node --test` in `~/projects/skill-validator` (10 tests: spec, OpenAgent, well-known, Claude, Agent Plugins, fallback parser)
 - Broken cases proven: name mismatch → exit 1, invalid marketplace.json → FAIL, missing well-known `$schema` → FAIL, Agent Plugins bad name/missing `$schema`/unknown field → FAIL

@@ -197,3 +197,27 @@ test('agent plugins: mcp.json invalid fails', async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('groupChecksByStandard buckets checks correctly', async () => {
+  const root = await makeRepo({
+    'plugin.json': JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'acme.tools',
+    }),
+    'skills/demo-skill/SKILL.md': GOOD_SKILL,
+  });
+  try {
+    const checks = await validate(root);
+    const groups = (await import('../src/validate.js')).groupChecksByStandard(checks);
+    const byName = Object.fromEntries(groups.map((g) => [g.name, g]));
+    assert.ok(byName['Agent Plugins 1.0.0'], 'agentplugins group exists');
+    assert.ok(byName['agentskills.io'], 'agentskills group exists');
+    assert.ok(byName['OpenAgent skills.sh'], 'openagent group exists');
+    assert.ok(byName['Claude Code'], 'claude group exists');
+    assert.equal(byName['Agent Plugins 1.0.0'].total, byName['Agent Plugins 1.0.0'].passed, 'valid plugin: all agentplugins checks pass');
+    const total = groups.reduce((n, g) => n + g.total, 0);
+    assert.equal(total, checks.length, 'groups cover every check');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

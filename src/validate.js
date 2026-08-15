@@ -471,6 +471,39 @@ export async function validate(root) {
   return checks;
 }
 
+// Group checks by standard. Check names carry a standard keyword, so the
+// mapping is structural, not guessed: agentplugins, openagent, claude,
+// hermes, anthropic, spec. Anything else lands in General.
+export function groupChecksByStandard(checks) {
+  const KEYWORDS = [
+    ['agentplugins', 'Agent Plugins 1.0.0'],
+    ['openagent', 'OpenAgent skills.sh'],
+    ['claude', 'Claude Code'],
+    ['hermes', 'Hermes in-repo'],
+    ['anthropic', 'Anthropic best practices'],
+    ['spec:', 'agentskills.io'],
+  ];
+  const groups = new Map();
+  const labelFor = (name) => {
+    for (const [kw, label] of KEYWORDS) {
+      if (name.includes(kw)) return label;
+    }
+    return 'General';
+  };
+  for (const c of checks) {
+    const label = labelFor(c.name);
+    if (!groups.has(label)) {
+      groups.set(label, { name: label, passed: 0, failed: 0, total: 0, ok: true, checks: [] });
+    }
+    const g = groups.get(label);
+    g.total += 1;
+    if (c.ok) g.passed += 1;
+    else { g.failed += 1; g.ok = false; }
+    g.checks.push(c);
+  }
+  return [...groups.values()];
+}
+
 // CLI entry when run directly: `node validate.js <dir>` (library otherwise)
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {

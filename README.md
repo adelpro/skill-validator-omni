@@ -64,6 +64,28 @@ npx skill-validator-cli ./my-skill --json
 npx skill-validator-cli ./my-skills-repo
 ```
 
+### Per-standard scores
+
+The report ends with a per-standard breakdown. Each standard gets its own pass/fail count, so you see where a skill falls short without reading every check:
+
+```bash
+$ npx skill-validator-cli ./my-skill
+34/34 checks passed
+Per standard:
+  [PASS] agentskills.io: 6/6
+  [PASS] Anthropic best practices: 3/3
+  [PASS] Hermes in-repo: 12/12
+  [PASS] OpenAgent skills.sh: 2/2
+  [PASS] Claude Code: 4/4
+  [PASS] Agent Plugins 1.0.0: 7/7
+```
+
+In JSON mode the same breakdown lives in `standards`, one object per standard with `passed`, `failed`, `total`, and `ok`. Gate CI on a single standard:
+
+```bash
+npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
+```
+
 ### Exit codes
 
 | Code | Meaning |
@@ -77,12 +99,15 @@ npx skill-validator-cli ./my-skills-repo
 ```json
 {
   "tool": "skill-validator-cli",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "target": "./my-skill",
   "passed": 27,
   "failed": 0,
   "total": 27,
   "ok": true,
+  "standards": [
+    { "name": "Agent Plugins 1.0.0", "passed": 7, "failed": 0, "total": 7, "ok": true, "checks": [] }
+  ],
   "checks": [{ "name": "spec: name == directory", "ok": true, "detail": "" }]
 }
 ```

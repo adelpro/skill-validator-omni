@@ -8,7 +8,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validate } from '../src/validate.js';
+import { validate, groupChecksByStandard } from '../src/validate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(await readFile(join(__dirname, '..', 'package.json'), 'utf8'));
@@ -52,6 +52,7 @@ try {
 }
 
 const failed = checks.filter((c) => !c.ok);
+const standards = groupChecksByStandard(checks);
 
 if (json) {
   const out = {
@@ -62,6 +63,7 @@ if (json) {
     failed: failed.length,
     total: checks.length,
     ok: failed.length === 0,
+    standards,
     checks,
   };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
@@ -72,6 +74,11 @@ if (json) {
     console.log(`  [${mark}] ${c.name}${c.detail ? `  (${c.detail})` : ''}`);
   }
   console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+  console.log('Per standard:');
+  for (const g of standards) {
+    const mark = g.ok ? 'PASS' : 'FAIL';
+    console.log(`  [${mark}] ${g.name}: ${g.passed}/${g.total}`);
+  }
 }
 
 process.exit(failed.length === 0 ? 0 : 1);
