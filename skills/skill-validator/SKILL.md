@@ -1,14 +1,14 @@
 ---
 name: skill-validator
 description: Validates skills against authoring standards. Use to audit.
-version: 2.3.0
+version: 2.4.0
 author: Adel Ben Yahia (adelpro)
 license: MIT
 platforms: [linux, macos, windows]
 compatibility: Requires Node.js 18+ (yaml package installed via npm).
 metadata:
   author: Adel Ben Yahia (adelpro)
-  version: 2.3.0
+  version: 2.4.0
   hermes:
     tags: [skills, validation, standards, audit, cli]
     related_skills: [skill-engineer, hermes-agent-skill-authoring, publishing-skills]
@@ -67,7 +67,7 @@ A skill project passes install checks when it satisfies at least one discoverabl
 
 ## Procedure
 
-1. **Validate** — `npx skill-validator-cli <dir>` (or `node scripts/validate.js <dir>`). Read the PASS/FAIL report.
+1. **Validate** — `npx skill-validator-cli <dir>` (or `node scripts/validate.js <dir>`). Read the PASS/FAIL report. Add `-s <standard>` to run one standard (repeatable; `--list-standards` shows names; `--all` is the default).
 2. **Fix failures** — each check prints the offending detail; fix frontmatter/structure and re-run until exit 0.
 3. **CI gate** — `npx skill-validator-cli <dir> --json | jq -e '.ok'` (JSON report, exit 1 on failure).
 4. **Verify installability for publish** — `npx skills add <owner>/<repo> --list -y` must list your skills; for Claude, confirm the marketplace/plugin layouts above.

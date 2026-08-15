@@ -568,6 +568,55 @@ export function groupChecksByStandard(checks) {
   return [...groups.values()];
 }
 
+// Canonical standard identifiers accepted by --standard / -s.
+export const STANDARD_IDS = ['agentplugins', 'agentskills', 'anthropic', 'hermes', 'openagent', 'claude'];
+
+export const STANDARD_ALIASES = new Map([
+  ['agentplugins', 'Agent Plugins 1.0.0'],
+  ['agent-plugin', 'Agent Plugins 1.0.0'],
+  ['agentplugin', 'Agent Plugins 1.0.0'],
+  ['plugins', 'Agent Plugins 1.0.0'],
+  ['agentskills', 'agentskills.io'],
+  ['agentskills.io', 'agentskills.io'],
+  ['spec', 'agentskills.io'],
+  ['anthropic', 'Anthropic best practices'],
+  ['anthropic best practices', 'Anthropic best practices'],
+  ['hermes', 'Hermes in-repo'],
+  ['hermes in-repo', 'Hermes in-repo'],
+  ['openagent', 'OpenAgent skills.sh'],
+  ['skills.sh', 'OpenAgent skills.sh'],
+  ['claude', 'Claude Code'],
+  ['claude-code', 'Claude Code'],
+  ['claude code', 'Claude Code'],
+]);
+
+// Resolve a requested standard id/alias to its group label, or null if unknown.
+export function resolveStandardLabel(id) {
+  const label = STANDARD_ALIASES.get(String(id).toLowerCase());
+  return label ?? null;
+}
+
+// Filter checks to the requested standards. General checks (skills found,
+// structural) always run, so a filtered run is never meaningless. Returns
+// { ok: false, unknown: [...] } when a requested standard is not recognised.
+export function filterChecksByStandard(checks, requested) {
+  const labels = new Set();
+  const unknown = [];
+  for (const id of requested) {
+    const label = resolveStandardLabel(id);
+    if (label === null) unknown.push(id);
+    else labels.add(label);
+  }
+  if (unknown.length > 0) return { ok: false, unknown, checks: [] };
+  if (labels.size === 0) return { ok: true, checks };
+  const groups = groupChecksByStandard(checks);
+  const kept = [];
+  for (const g of groups) {
+    if (g.name === 'General' || labels.has(g.name)) kept.push(...g.checks);
+  }
+  return { ok: true, checks: kept };
+}
+
 // CLI entry when run directly: `node validate.js <dir>` (library otherwise)
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isMain) {

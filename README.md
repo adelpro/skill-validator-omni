@@ -64,6 +64,25 @@ npx skill-validator-cli ./my-skill --json
 npx skill-validator-cli ./my-skills-repo
 ```
 
+### Choosing standards
+
+By default every standard runs. To run only some:
+
+```bash
+npx skill-validator-cli ./my-skill --standard hermes          # one standard
+npx skill-validator-cli ./my-skill -s hermes -s claude        # several (repeatable)
+npx skill-validator-cli ./my-skill --all                      # every standard (the default)
+npx skill-validator-cli --list-standards                      # valid names
+```
+
+General checks (skill discovery) always run, so a filtered run still answers "is this even a valid skill layout?". The JSON report records what was requested:
+
+```bash
+npx skill-validator-cli ./my-skill -s agentplugins --json | jq -r '.requested'
+```
+
+Unknown standard names exit with code 2 and print the valid names.
+
 ### Per-standard scores
 
 The report ends with a per-standard breakdown. Each standard gets its own pass/fail count, so you see where a skill falls short without reading every check:

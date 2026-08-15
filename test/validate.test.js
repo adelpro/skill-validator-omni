@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { validate, parseSimpleYaml } from '../src/validate.js';
+import { validate, parseSimpleYaml, filterChecksByStandard } from '../src/validate.js';
 
 const GOOD_SKILL = `---
 name: demo-skill
@@ -232,6 +232,43 @@ test('every check carries a description', async () => {
     }
     const failed = checks.find((c) => c.name.includes('spec: name == directory'));
     assert.ok(failed.description.includes('directory name'), 'description explains the rule');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('filterChecksByStandard keeps only requested standards + General', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    const r = filterChecksByStandard(checks, ['hermes']);
+    assert.ok(r.ok);
+    assert.ok(r.checks.every((c) => c.name.includes('hermes') || c.name === 'skills found'), 'only hermes + general');
+    assert.ok(r.checks.some((c) => c.name.includes('hermes: ## Procedure')));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('filterChecksByStandard rejects unknown standards', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    const r = filterChecksByStandard(checks, ['bogus']);
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.unknown, ['bogus']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('filterChecksByStandard resolves aliases', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    const r = filterChecksByStandard(checks, ['spec', 'claude-code']);
+    assert.ok(r.ok);
+    assert.ok(r.checks.every((c) => c.name.includes('spec:') || c.name.includes('claude') || c.name === 'skills found'));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
