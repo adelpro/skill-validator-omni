@@ -1,14 +1,14 @@
 ---
 name: skill-validator
 description: Validates skills against authoring standards. Use to audit.
-version: 2.2.0
+version: 2.3.0
 author: Adel Ben Yahia (adelpro)
 license: MIT
 platforms: [linux, macos, windows]
 compatibility: Requires Node.js 18+ (yaml package installed via npm).
 metadata:
   author: Adel Ben Yahia (adelpro)
-  version: 2.2.0
+  version: 2.3.0
   hermes:
     tags: [skills, validation, standards, audit, cli]
     related_skills: [skill-engineer, hermes-agent-skill-authoring, publishing-skills]

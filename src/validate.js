@@ -232,6 +232,70 @@ export function validateSingleSkill(skillDir, prefix = '') {
   return run();
 }
 
+// Human-readable description for each check. Matched by substring against
+// the full check name, most specific first, so prefixed checks
+// ("skills/x: spec: name format", "agentplugins: ./my-plugin: name format")
+// resolve to the right entry.
+const DESCRIPTIONS = [
+  ['spec: name == directory', 'Frontmatter name must equal the skill directory name. Installers (npx skills, agents) resolve a skill by directory, so a mismatch breaks discovery.'],
+  ['spec: name format', 'Skill name: lowercase alphanumerics and hyphens only, no leading, trailing, or consecutive hyphens.'],
+  ['spec: name <= 64 chars', 'Skill name must be at most 64 characters.'],
+  ['spec: description 1-1024', 'Frontmatter must declare a description of 1 to 1024 characters.'],
+  ['spec: body non-empty', 'The SKILL.md body after the frontmatter must not be empty.'],
+  ['spec: compatibility <= 500', 'The optional compatibility field must stay within 500 characters.'],
+  ['anthropic: third person', 'Description should describe what the skill does (third person), not instruct the agent.'],
+  ['anthropic: body < 500 lines', 'Anthropic recommends keeping SKILL.md under 500 lines; move detail into references/ files.'],
+  ['anthropic: progressive disclosure', 'Long content belongs in supporting files (references/, scripts/, templates/) so the main SKILL.md stays scannable.'],
+  ['hermes: description <= 60', 'Hermes truncates descriptions in its skill index, so keep the description under 60 characters.'],
+  ['hermes: description ends with .', 'Hermes convention: the description ends with a full stop.'],
+  ['hermes: has version', 'Frontmatter must declare a version.'],
+  ['hermes: has author', 'Frontmatter must declare an author.'],
+  ['hermes: has license', 'Frontmatter must declare a license.'],
+  ['hermes: has platforms', 'Frontmatter must declare platforms (e.g. linux, macos, windows).'],
+  ['hermes: metadata.hermes.tags', 'metadata.hermes.tags with category keywords improves discovery.'],
+  ['hermes: metadata.hermes.related_skills', 'metadata.hermes.related_skills links to sibling skills in the same category.'],
+  ['hermes: ## When to Use', 'The body must include the "When to Use" section.'],
+  ['hermes: ## Procedure', 'The body must include the "Procedure" section.'],
+  ['hermes: ## Pitfalls', 'The body must include the "Pitfalls" section.'],
+  ['hermes: ## Verification', 'The body must include the "Verification" section.'],
+  ['skills found', 'A SKILL.md must exist at the repo root, under skills/ (max 3 levels), or in an agent skills directory.'],
+  ['openagent: npx skills discoverable layout', 'npx skills and agent tooling discover skills via this layout: root SKILL.md, skills/ (max 3 levels), or agent dirs.'],
+  ['openagent: every skill dir name == frontmatter name', 'Each discovered skill directory name must match its frontmatter name.'],
+  ['openagent: well-known index $schema', 'A well-known discovery index (.well-known/agent-skills/) must declare the official agentskills.io schema URL.'],
+  ['claude: marketplace.json valid JSON', '.claude-plugin/marketplace.json must parse as JSON.'],
+  ['claude: marketplace has name', 'A Claude Code marketplace must declare a name.'],
+  ['claude: marketplace lists plugins', 'A marketplace must list at least one plugin.'],
+  ['claude: plugin ', 'A Claude Code plugin manifest (.claude-plugin/plugin.json) must be valid JSON and declare a name and skills/.'],
+  ['claude: installable layout', 'The repo is directly installable in Claude Code via a marketplace or .claude/skills.'],
+  ['agentplugins: no plugin.json manifest', 'No Agent Plugin manifest found; the repo makes no Agent Plugins compliance claims (fine for plain skill repos).'],
+  ['agentplugins: manifest readable', 'The plugin.json manifest must be readable.'],
+  ['agentplugins: manifest valid JSON', 'The plugin.json manifest must parse as JSON.'],
+  ['agentplugins: $schema declares Agent Plugins', 'The manifest must reference the official Agent Plugins schema URL (https://agent-plugins.org/schemas/1.0.0/plugin.schema.json).'],
+  ['agentplugins: name format', 'Plugin name: 1-64 chars, lowercase alphanumerics, hyphens, dots; no "--" or ".."; must start and end alphanumeric.'],
+  ['agentplugins: no unknown top-level fields', 'Agent Plugins uses a closed schema; unknown top-level fields are rejected.'],
+  ['agentplugins: keywords is array', 'keywords must be an array of strings.'],
+  ['agentplugins: author is object', 'author must be an object (or null).'],
+  ['agentplugins: skills/ layout', 'Plugin skills are immediate children of skills/ (skills/<name>/SKILL.md). A skills/ file is invalid; a missing skills/ is fine for MCP-only plugins.'],
+  ['agentplugins: mcp.json valid JSON', 'mcp.json (when present) must parse as a JSON object.'],
+  ['name format', 'The name must follow the standard\'s format rules: lowercase alphanumerics and hyphens, no leading, trailing, or consecutive hyphens.'],
+  ['manifest valid JSON', 'The manifest must parse as JSON.'],
+];
+
+export function describeCheck(name) {
+  for (const [sub, desc] of DESCRIPTIONS) {
+    if (name.includes(sub)) return desc;
+  }
+  return 'Validation check from the skill standards (agentskills.io, agent-plugins.org, skills.sh).';
+}
+
+// Attach a description to every check before returning.
+function annotateChecks(checks) {
+  for (const c of checks) {
+    if (!c.description) c.description = describeCheck(c.name);
+  }
+  return checks;
+}
+
 export async function validate(root) {
   const checks = [];
   const rootSkill = join(root, 'SKILL.md');
@@ -468,7 +532,7 @@ export async function validate(root) {
     }
   }
 
-  return checks;
+  return annotateChecks(checks);
 }
 
 // Group checks by standard. Check names carry a standard keyword, so the

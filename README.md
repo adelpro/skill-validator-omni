@@ -99,7 +99,7 @@ npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
 ```json
 {
   "tool": "skill-validator-cli",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "target": "./my-skill",
   "passed": 27,
   "failed": 0,
@@ -108,9 +108,18 @@ npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
   "standards": [
     { "name": "Agent Plugins 1.0.0", "passed": 7, "failed": 0, "total": 7, "ok": true, "checks": [] }
   ],
-  "checks": [{ "name": "spec: name == directory", "ok": true, "detail": "" }]
+  "checks": [
+    {
+      "name": "spec: name == directory",
+      "ok": true,
+      "detail": "my-skill vs dir my-skill",
+      "description": "Frontmatter name must equal the skill directory name. Installers (npx skills, agents) resolve a skill by directory, so a mismatch breaks discovery."
+    }
+  ]
 }
 ```
+
+Every check entry carries a `description` explaining what it verifies, so CI users and skill authors know what a failure means without reading the source.
 
 ## What gets validated
 

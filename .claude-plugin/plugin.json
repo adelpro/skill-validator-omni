@@ -1,7 +1,7 @@
 {
   "name": "skill-validator",
   "description": "Multi-standard validator for agent skills (Agent Plugins 1.0.0, agentskills.io, Anthropic, Hermes, skills.sh, Claude Code)",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": {
     "name": "Adel Ben Yahia"
   },

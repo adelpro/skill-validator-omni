@@ -221,3 +221,18 @@ test('groupChecksByStandard buckets checks correctly', async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('every check carries a description', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    assert.ok(checks.length > 0);
+    for (const c of checks) {
+      assert.ok(typeof c.description === 'string' && c.description.length > 10, `missing description: ${c.name}`);
+    }
+    const failed = checks.find((c) => c.name.includes('spec: name == directory'));
+    assert.ok(failed.description.includes('directory name'), 'description explains the rule');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
