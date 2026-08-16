@@ -1,7 +1,7 @@
 {
   "name": "skill-validator-cli",
-  "version": "1.4.0",
-  "description": "Validate agent skills against multiple standards (agentskills.io, Anthropic, Hermes, skills.sh, Claude Code) in one command.",
+  "version": "1.5.0",
+  "description": "Validate agent skills against 7 standards (agentskills.io, Anthropic, Hermes, skills.sh, Claude Code, Agent Plugins, OpenAI Codex) in one command.",
   "license": "MIT",
   "type": "module",
   "bin": {
@@ -31,7 +31,9 @@
     "agentskills",
     "anthropic",
     "claude-code",
-    "skills.sh"
+    "skills.sh",
+    "codex",
+    "openai"
   ],
   "repository": {
     "type": "git",

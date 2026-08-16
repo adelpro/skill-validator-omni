@@ -1,7 +1,7 @@
 // skill-validator — validate agent skills against multiple standards.
 // Standards: agentskills.io spec, Anthropic best practices, Hermes in-repo
 // standard, OpenAgent skills.sh ecosystem discoverability, Claude Code
-// marketplace installability.
+// marketplace installability, OpenAI Codex (CLI + ChatGPT) skill format.
 //
 // Canonical source: https://github.com/adelpro/skill-validator
 // (the Hermes skill keeps a synced copy under scripts/validate.js)
@@ -88,6 +88,13 @@ export const AGENT_PLUGINS_MCP_SCHEMA = 'https://agent-plugins.org/schemas/1.0.0
 const AGENT_PLUGINS_ALLOWED_FIELDS = new Set([
   '$schema', 'name', 'version', 'description', 'author', 'homepage',
   'repository', 'license', 'keywords', 'extensions',
+]);
+
+// OpenAI Codex skill frontmatter: only these keys are allowed. Mirrors the
+// official quick_validate.py from openai/skills ("Do not include any other
+// fields in YAML frontmatter" — skill-creator).
+const CODEX_ALLOWED_FIELDS = new Set([
+  'name', 'description', 'license', 'allowed-tools', 'metadata',
 ]);
 
 const AGENT_SKILL_DIRS = [
@@ -227,6 +234,91 @@ export function validateSingleSkill(skillDir, prefix = '') {
     for (const section of ['When to Use', 'Procedure', 'Pitfalls', 'Verification']) {
       checks.push({ name: `${prefix}hermes: ## ${section}`, ok: body.includes(`## ${section}`) });
     }
+
+    // Codex / OpenAI (developers.openai.com/codex/skills + openai/skills
+    // quick_validate.py). Codex reads ONLY name + description to decide when a
+    // skill triggers; everything else must live in the body or supporting
+    // files. The directory must be named exactly after the skill.
+    const codexName = name === skillDir.split(/[\\/]/).pop();
+    const codexNameFormat = /^[a-z0-9-]+$/.test(name) &&
+      !name.startsWith('-') && !name.endsWith('-') && !name.includes('--');
+    const unexpected = Object.keys(fm).filter((k) => !CODEX_ALLOWED_FIELDS.has(k));
+    checks.push({ name: `${prefix}codex: name == directory`, ok: codexName, detail: `${name} vs dir ${skillDir}` });
+    checks.push({
+      name: `${prefix}codex: name format`,
+      ok: codexNameFormat,
+      detail: 'hyphen-case: lowercase letters/digits/hyphens, no leading/trailing/consecutive hyphens (openai/skills quick_validate.py)',
+    });
+    checks.push({
+      name: `${prefix}codex: name <= 64 chars`,
+      ok: name.length >= 1 && name.length <= 64,
+      detail: `${name.length} chars`,
+    });
+    checks.push({
+      name: `${prefix}codex: frontmatter fields allowed`,
+      ok: unexpected.length === 0,
+      detail: unexpected.length
+        ? `unexpected field(s): ${unexpected.slice(0, 4).join(', ')} (allowed: name, description, license, allowed-tools, metadata)`
+        : 'only name/description/license/allowed-tools/metadata',
+    });
+    checks.push({
+      name: `${prefix}codex: description present`,
+      ok: 'description' in fm && String(fm.description ?? '').length > 0,
+    });
+    checks.push({
+      name: `${prefix}codex: description no angle brackets`,
+      ok: !/[<>]/.test(desc),
+      detail: 'quick_validate.py rejects < and > in descriptions',
+    });
+    checks.push({
+      name: `${prefix}codex: description <= 1024`,
+      ok: desc.length <= 1024,
+      detail: `${desc.length} chars`,
+    });
+    checks.push({
+      name: `${prefix}codex: description is the trigger`,
+      ok: /\b(when|use|used|for|triggers?|handles?|helps?|if)\b/i.test(desc),
+      detail: 'Codex matches a skill by description alone — include what it does AND when to use it (front-load trigger words)',
+    });
+    checks.push({
+      name: `${prefix}codex: body < 500 lines`,
+      ok: lineCount < 500,
+      detail: `${lineCount} lines`,
+    });
+    // no ancillary docs: skill-creator says a skill must NOT contain
+    // README.md / INSTALLATION_GUIDE.md / QUICK_REFERENCE.md / CHANGELOG.md
+    const ancillaryDocs = ['README.md', 'INSTALLATION_GUIDE.md', 'QUICK_REFERENCE.md', 'CHANGELOG.md'];
+    const ancillaryFound = [];
+    try {
+      const entries = await readdir(skillDir, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.isFile() && ancillaryDocs.includes(e.name)) ancillaryFound.push(e.name);
+      }
+    } catch { /* ignore */ }
+    checks.push({
+      name: `${prefix}codex: no ancillary docs`,
+      ok: ancillaryFound.length === 0,
+      detail: ancillaryFound.length ? `remove ${ancillaryFound.join(', ')}` : 'only SKILL.md + resources allowed',
+    });
+    // agents/openai.yaml — optional Codex/ChatGPT UI metadata (interface,
+    // policy, dependencies). Must parse as YAML with known top-level keys.
+    const oaiPath = join(skillDir, 'agents', 'openai.yaml');
+    const oaiContent = await readFile(oaiPath, 'utf8').catch(() => null);
+    if (oaiContent !== null) {
+      const OAI_ALLOWED_KEYS = new Set(['interface', 'policy', 'dependencies']);
+      try {
+        const oai = parseYaml(oaiContent);
+        const oaiKeys = Object.keys(oai ?? {});
+        const oaiUnknown = oaiKeys.filter((k) => !OAI_ALLOWED_KEYS.has(k));
+        checks.push({
+          name: `${prefix}codex: agents/openai.yaml keys`,
+          ok: oaiUnknown.length === 0,
+          detail: oaiUnknown.length ? `unknown key(s): ${oaiUnknown.join(', ')} (allowed: interface, policy, dependencies)` : oaiKeys.join(', '),
+        });
+      } catch (e) {
+        checks.push({ name: `${prefix}codex: agents/openai.yaml keys`, ok: false, detail: `invalid YAML: ${e.message}` });
+      }
+    }
     return checks;
   }
   return run();
@@ -267,6 +359,18 @@ const DESCRIPTIONS = [
   ['claude: marketplace lists plugins', 'A marketplace must list at least one plugin.'],
   ['claude: plugin ', 'A Claude Code plugin manifest (.claude-plugin/plugin.json) must be valid JSON and declare a name and skills/.'],
   ['claude: installable layout', 'The repo is directly installable in Claude Code via a marketplace or .claude/skills.'],
+  ['codex: repo-scoped .agents/skills layout', 'Codex CLI auto-scans .agents/skills upward from the working directory to the repo root (legacy: .codex/skills). Without one of these, Codex will not auto-load the skills — install them with `npx skills add -a codex` or as an Agent Plugins package instead.'],
+  ['codex: name == directory', 'Codex resolves a skill by its directory; the directory must be named exactly after the frontmatter name.'],
+  ['codex: name format', 'Codex names are hyphen-case: lowercase letters, digits, hyphens, no leading/trailing/consecutive hyphens (openai/skills quick_validate.py).'],
+  ['codex: name <= 64 chars', 'Codex caps skill names at 64 characters.'],
+  ['codex: frontmatter fields allowed', 'Codex (openai/skills quick_validate.py) allows only name, description, license, allowed-tools, and metadata in the frontmatter. Hermes-style fields (version, author, platforms) are rejected — keep those in skills targeted at other hosts, or accept a Codex failure here.'],
+  ['codex: description present', 'Codex requires a description in the frontmatter.'],
+  ['codex: description no angle brackets', 'Codex quick_validate.py rejects angle brackets (< >) in descriptions.'],
+  ['codex: description <= 1024', 'Codex caps descriptions at 1024 characters.'],
+  ['codex: description is the trigger', 'Codex matches skills by description only (the body loads after triggering) — the description must state what the skill does AND when to use it, with trigger words front-loaded.'],
+  ['codex: body < 500 lines', 'Codex progressive disclosure: keep SKILL.md under 500 lines; move detail into references/ and scripts/.'],
+  ['codex: no ancillary docs', 'A Codex skill contains only SKILL.md plus supporting dirs — README.md, INSTALLATION_GUIDE.md, QUICK_REFERENCE.md, and CHANGELOG.md are explicitly discouraged (skill-creator).'],
+  ['codex: agents/openai.yaml keys', 'Optional Codex/ChatGPT UI metadata (agents/openai.yaml) with only interface, policy, and dependencies keys.'],
   ['agentplugins: no plugin.json manifest', 'No Agent Plugin manifest found; the repo makes no Agent Plugins compliance claims (fine for plain skill repos).'],
   ['agentplugins: manifest readable', 'The plugin.json manifest must be readable.'],
   ['agentplugins: manifest valid JSON', 'The plugin.json manifest must parse as JSON.'],
@@ -285,7 +389,7 @@ export function describeCheck(name) {
   for (const [sub, desc] of DESCRIPTIONS) {
     if (name.includes(sub)) return desc;
   }
-  return 'Validation check from the skill standards (agentskills.io, agent-plugins.org, skills.sh).';
+  return 'Validation check from the skill standards (agentskills.io, agent-plugins.org, skills.sh, Codex).';
 }
 
 // Attach a description to every check before returning.
@@ -434,6 +538,38 @@ export async function validate(root) {
     });
   }
 
+  // --- Codex / OpenAI repo discovery ---
+  // Codex CLI auto-scans .agents/skills upward from $CWD to the repo root
+  // ("Where Codex loads local skills" — developers.openai.com/codex/skills);
+  // .codex/skills is the legacy repo-scoped location. A repo with a valid
+  // Agent Plugins manifest (plugin.json) is also Codex-installable — Codex
+  // distributes skills via plugins. A bare skills/ repo without any of these
+  // still works via `npx skills add -a codex` (skills.sh layout, above).
+  const codexScoped = [];
+  for (const cd of ['.agents/skills', '.codex/skills']) {
+    codexScoped.push(...(await walkForSkillMds(join(root, cd), 2)));
+  }
+  const rootIsSkill = await hasSkillMd(root);
+  const rootPlugin = await readFile(join(root, 'plugin.json'), 'utf8').catch(() => null);
+  let pluginIsAgentPlugins = false;
+  if (rootPlugin) {
+    try {
+      pluginIsAgentPlugins = JSON.parse(rootPlugin).$schema === AGENT_PLUGINS_SCHEMA;
+    } catch { /* invalid JSON — the agentplugins section reports it */ }
+  }
+  const codexLayoutOk = rootIsSkill || codexScoped.length > 0 || pluginIsAgentPlugins;
+  checks.push({
+    name: 'codex: repo-scoped .agents/skills layout',
+    ok: codexLayoutOk,
+    detail: codexScoped.length
+      ? `${codexScoped.length} skill(s) under .agents/skills / .codex/skills — Codex auto-loads these`
+      : pluginIsAgentPlugins
+        ? 'Agent Plugins manifest at root — Codex installs skills from plugins'
+        : rootIsSkill
+          ? 'single-skill dir: Codex loads a SKILL.md at the root it is run from'
+          : 'no .agents/skills, .codex/skills, or plugin.json — Codex will not auto-load these skills (use npx skills add -a codex or package a plugin)',
+  });
+
   // --- Agent Plugins 1.0.0 (agent-plugins.org, vendor-neutral spec) ---
   // A plugin dir contains plugin.json at its root. Check the repo root and
   // nested plugin dirs (up to 2 levels), like the Claude plugin scan above.
@@ -543,6 +679,7 @@ export function groupChecksByStandard(checks) {
     ['agentplugins', 'Agent Plugins 1.0.0'],
     ['openagent', 'OpenAgent skills.sh'],
     ['claude', 'Claude Code'],
+    ['codex', 'Codex (OpenAI)'],
     ['hermes', 'Hermes in-repo'],
     ['anthropic', 'Anthropic best practices'],
     ['spec:', 'agentskills.io'],
@@ -569,7 +706,7 @@ export function groupChecksByStandard(checks) {
 }
 
 // Canonical standard identifiers accepted by --standard / -s.
-export const STANDARD_IDS = ['agentplugins', 'agentskills', 'anthropic', 'hermes', 'openagent', 'claude'];
+export const STANDARD_IDS = ['agentplugins', 'agentskills', 'anthropic', 'hermes', 'openagent', 'claude', 'codex'];
 
 export const STANDARD_ALIASES = new Map([
   ['agentplugins', 'Agent Plugins 1.0.0'],
@@ -588,6 +725,10 @@ export const STANDARD_ALIASES = new Map([
   ['claude', 'Claude Code'],
   ['claude-code', 'Claude Code'],
   ['claude code', 'Claude Code'],
+  ['codex', 'Codex (OpenAI)'],
+  ['codex-cli', 'Codex (OpenAI)'],
+  ['openai', 'Codex (OpenAI)'],
+  ['openai-codex', 'Codex (OpenAI)'],
 ]);
 
 // Resolve a requested standard id/alias to its group label, or null if unknown.

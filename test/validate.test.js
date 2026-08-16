@@ -36,6 +36,25 @@ Does demo things.
 - ok
 `;
 
+// Strict Codex skill: only the frontmatter keys openai/skills quick_validate.py
+// permits. Deliberately NOT Hermes-compliant (no version/author/platforms) —
+// the two standards conflict on frontmatter, so each gets its own fixture.
+const CODEX_SKILL = `---
+name: demo-skill
+description: Use when the user needs a compliant Codex skill for tests or demos.
+license: MIT
+allowed-tools: Bash(git:*) Read
+metadata:
+  short-description: Demo Codex skill
+---
+# Demo Skill
+
+Does demo things.
+
+## Procedure
+1. Run.
+`;
+
 async function makeRepo(layout) {
   const root = await mkdtemp(join(tmpdir(), 'sv-test-'));
   for (const [path, content] of Object.entries(layout)) {
@@ -50,8 +69,126 @@ test('good single skill passes', async () => {
   const root = await makeRepo({ 'demo-skill/SKILL.md': GOOD_SKILL });
   try {
     const checks = await validate(join(root, 'demo-skill'));
-    const failed = checks.filter((c) => !c.ok);
+    // Hermes-compliant skills carry version/author/platforms, which the Codex
+    // standard (quick_validate.py) deliberately forbids — so for a Hermes
+    // skill only the codex frontmatter checks may fail. Everything else must pass.
+    const failed = checks.filter((c) => !c.ok && !c.name.startsWith('codex:'));
     assert.equal(failed.length, 0, JSON.stringify(failed, null, 2));
+    const codexFailed = checks.filter((c) => !c.ok && c.name.startsWith('codex:'));
+    assert.ok(codexFailed.length > 0, 'hermes skill fails some codex frontmatter checks (expected conflict)');
+    assert.ok(codexFailed.every((c) => c.name.includes('frontmatter fields allowed')), 'only the frontmatter-conflict check may fail: ' + JSON.stringify(codexFailed.map((c) => c.name)));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: strict codex skill passes the codex standard', async () => {
+  const root = await makeRepo({ 'demo-skill/SKILL.md': CODEX_SKILL });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    const codexChecks = checks.filter((c) => c.name.startsWith('codex:'));
+    assert.ok(codexChecks.length > 0, 'codex checks exist');
+    const failed = codexChecks.filter((c) => !c.ok);
+    assert.equal(failed.length, 0, JSON.stringify(failed, null, 2));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: unexpected frontmatter fields fail', async () => {
+  const root = await makeRepo({ 'demo-skill/SKILL.md': GOOD_SKILL.replace('version: 0.1.0\n', '') });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: frontmatter fields allowed' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: description with angle brackets fails', async () => {
+  const root = await makeRepo({ 'demo-skill/SKILL.md': CODEX_SKILL.replace('Use when the user needs', 'Needs <b>bold</b> when the user needs') });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: description no angle brackets' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: description without trigger words fails', async () => {
+  const root = await makeRepo({ 'demo-skill/SKILL.md': CODEX_SKILL.replace('Use when the user needs a compliant Codex skill for tests or demos.', 'Demonstrates compliance broadly.') });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: description is the trigger' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: name format rules enforced', async () => {
+  const root = await makeRepo({ 'demo-skill/SKILL.md': CODEX_SKILL.replace('name: demo-skill', 'name: Demo--Skill') });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: name format' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: ancillary docs flagged', async () => {
+  const root = await makeRepo({
+    'demo-skill/SKILL.md': CODEX_SKILL,
+    'demo-skill/README.md': '# readme',
+  });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: no ancillary docs' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: agents/openai.yaml keys enforced when present', async () => {
+  const root = await makeRepo({
+    'demo-skill/SKILL.md': CODEX_SKILL,
+    'demo-skill/agents/openai.yaml': 'interface:\n  display_name: Demo\npolicy:\n  allow_implicit_invocation: false\n',
+  });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: agents/openai.yaml keys' && c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: agents/openai.yaml with unknown keys fails', async () => {
+  const root = await makeRepo({
+    'demo-skill/SKILL.md': CODEX_SKILL,
+    'demo-skill/agents/openai.yaml': 'interface:\n  display_name: Demo\nbogus: 1\n',
+  });
+  try {
+    const checks = await validate(join(root, 'demo-skill'));
+    assert.ok(checks.some((c) => c.name === 'codex: agents/openai.yaml keys' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: repo-scoped .agents/skills layout flagged when absent', async () => {
+  const root = await makeRepo({ 'skills/web/demo-skill/SKILL.md': CODEX_SKILL });
+  try {
+    const checks = await validate(root);
+    assert.ok(checks.some((c) => c.name === 'codex: repo-scoped .agents/skills layout' && !c.ok));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('codex: .agents/skills layout passes', async () => {
+  const root = await makeRepo({ '.agents/skills/demo-skill/SKILL.md': CODEX_SKILL });
+  try {
+    const checks = await validate(root);
+    assert.ok(checks.some((c) => c.name === 'codex: repo-scoped .agents/skills layout' && c.ok));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

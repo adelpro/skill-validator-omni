@@ -10,6 +10,7 @@ Other validators cover one spec. `skills-ref` checks only agentskills.io. Creati
 - **Hermes in-repo standard**: frontmatter fields, section structure, descriptions under 60 chars
 - **OpenAgent skills.sh ecosystem**: `npx skills add` discoverable layout, well-known index schema
 - **Claude Code**: plugin marketplace layout, plugin manifests, project `.claude/skills/`
+- **OpenAI Codex**: `openai/skills` frontmatter rules (closed field set), hyphen-case names, trigger-first descriptions, `.agents/skills` repo layout, no ancillary docs
 
 Needs only Node >=18. No Python, no PyYAML.
 
@@ -97,6 +98,7 @@ Per standard:
   [PASS] OpenAgent skills.sh: 2/2
   [PASS] Claude Code: 4/4
   [PASS] Agent Plugins 1.0.0: 7/7
+  [PASS] Codex (OpenAI): 12/12
 ```
 
 In JSON mode the same breakdown lives in `standards`, one object per standard with `passed`, `failed`, `total`, and `ok`. Gate CI on a single standard:
@@ -118,7 +120,7 @@ npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
 ```json
 {
   "tool": "skill-validator-cli",
-  "version": "1.3.0",
+  "version": "1.5.0",
   "target": "./my-skill",
   "passed": 27,
   "failed": 0,
@@ -150,8 +152,9 @@ Discovery follows the layouts the ecosystem actually installs from:
 - agent dirs: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.codex/skills/`, `.gemini/skills/`, `.config/opencode/skills/`
 - `.well-known/agent-skills/index.json` with `$schema: https://schemas.agentskills.io/discovery/0.2.0/schema.json`
 - `.claude-plugin/marketplace.json` + `<plugin>/.claude-plugin/plugin.json` + `<plugin>/skills/`
+- `.agents/skills/` or `.codex/skills/` (Codex repo-scoped auto-discovery), or an Agent Plugins `plugin.json` (Codex plugin distribution)
 
-Every skill found in a repo gets the full check suite. A broken skill nested inside a big repo can't hide. Agent Plugins manifests are checked against the spec's closed field set and name constraints.
+Every skill found in a repo gets the full check suite. A broken skill nested inside a big repo can't hide. Agent Plugins manifests are checked against the spec's closed field set and name constraints. The Codex standard mirrors `openai/skills`' own `quick_validate.py` (frontmatter limited to `name`/`description`/`license`/`allowed-tools`/`metadata`, hyphen-case names under 64 chars, no angle brackets in descriptions) plus the docs' trigger-first description guidance and `.agents/skills` repo layout.
 
 ## Examples
 

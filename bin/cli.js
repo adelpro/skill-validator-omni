@@ -55,7 +55,7 @@ if (help) {
 Validate agent skills against multiple standards:
   agentskills.io spec, Anthropic best practices, Hermes in-repo,
   OpenAgent skills.sh discoverability, Claude Code marketplaces,
-  Agent Plugins 1.0.0.
+  Agent Plugins 1.0.0, OpenAI Codex.
 
 Usage:
   skill-validator-cli <dir>                  human report (exit 0 = all pass)
