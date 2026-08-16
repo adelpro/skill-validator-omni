@@ -2,6 +2,8 @@
 
 Copy this into a new `SKILL.md`, replace the placeholders, then delete this comment block.
 
+> Codex note: this template is the Hermes flavour. OpenAI Codex rejects `version`, `author`, `platforms`, and `compatibility` at the top level — Codex skills take only `name`, `description`, `license`, `allowed-tools`, `metadata`. Use this template for Hermes/Claude/skills.sh targets; strip the extra fields (and drop `metadata.hermes`) for a strict Codex skill. Run `skill-validator-cli <dir> -s codex` to confirm.
+
 ```yaml
 ---
 name: <skill-name>                  # must equal the directory name; lowercase-hyphens
