@@ -1,7 +1,7 @@
 ---
 name: skill-validator-omni
 description: Validates skills against seven authoring standards across all agents. Use to audit/certify.
-version: 2.5.0
+version: 2.5.1
 author: Adel Ben Yahia (adelpro)
 license: MIT
 platforms: [linux, macos, windows]
