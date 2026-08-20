@@ -1,14 +1,14 @@
 {
-  "name": "adelpro-skill-validator",
+  "name": "adelpro-skill-validator-omni",
   "owner": {
     "name": "Adel Ben Yahia"
   },
   "plugins": [
     {
-      "name": "skill-validator",
+      "name": "skill-validator-omni",
       "source": {
         "source": "github",
-        "repo": "adelpro/skill-validator"
+        "repo": "adelpro/skill-validator-omni"
       },
       "description": "Multi-standard validator for agent skills (Agent Plugins 1.0.0, agentskills.io, Anthropic, Hermes, skills.sh, Claude Code)"
     }

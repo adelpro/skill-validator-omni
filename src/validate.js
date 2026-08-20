@@ -1,9 +1,9 @@
-// skill-validator — validate agent skills against multiple standards.
+// skill-validator-omni — validate agent skills against multiple standards.
 // Standards: agentskills.io spec, Anthropic best practices, Hermes in-repo
 // standard, OpenAgent skills.sh ecosystem discoverability, Claude Code
 // marketplace installability, OpenAI Codex (CLI + ChatGPT) skill format.
 //
-// Canonical source: https://github.com/adelpro/skill-validator
+// Canonical source: https://github.com/adelpro/skill-validator-omni
 // (the Hermes skill keeps a synced copy under scripts/validate.js)
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
@@ -668,6 +668,43 @@ export async function validate(root) {
     }
   }
 
+  // --- Multi-tool compatibility (report-only) ---
+  // Aggregates the repo-level install surfaces detected above into one view so a
+  // skill author can see how many ecosystems a skill installs into at once. This
+  // group is purely informational: it never fails a skill for having only one
+  // route, because a single-route skill is a valid choice, not an error.
+  const pkgContent = await readFile(join(root, 'package.json'), 'utf8').catch(() => null);
+  let hasNpmCli = false;
+  if (pkgContent) {
+    try {
+      const pkg = JSON.parse(pkgContent);
+      hasNpmCli = Boolean(pkg && typeof pkg === 'object' && pkg.bin);
+    } catch { /* invalid package.json — npm route not claimed */ }
+  }
+  const routes = [
+    { route: 'skills.sh (npx skills add)', present: discovered.length > 0 },
+    { route: 'Agent Plugins 1.0.0 (plugin.json)', present: apPluginDirs.length > 0 },
+    { route: 'Claude marketplace (.claude-plugin)', present: mpContent !== null },
+    { route: 'Claude .claude/skills', present: claudeProjectSkills.length > 0 },
+    { route: 'Codex (.agents/.codex/skills or plugin)', present: codexLayoutOk },
+    { route: 'npm CLI (package.json bin)', present: hasNpmCli },
+  ];
+  for (const { route, present } of routes) {
+    checks.push({
+      name: `multi-tool: ${route}`,
+      ok: true,
+      detail: present ? 'present' : 'not present',
+    });
+  }
+  const surfaces = routes.filter((r) => r.present);
+  checks.push({
+    name: 'multi-tool: install surfaces',
+    ok: true,
+    detail: surfaces.length
+      ? `${surfaces.length} install route(s): ${surfaces.map((s) => s.route.split(' ')[0]).join(', ')}`
+      : 'none detected',
+  });
+
   return annotateChecks(checks);
 }
 
@@ -680,6 +717,7 @@ export function groupChecksByStandard(checks) {
     ['openagent', 'OpenAgent skills.sh'],
     ['claude', 'Claude Code'],
     ['codex', 'Codex (OpenAI)'],
+    ['multi-tool', 'Multi-tool compatibility'],
     ['hermes', 'Hermes in-repo'],
     ['anthropic', 'Anthropic best practices'],
     ['spec:', 'agentskills.io'],
@@ -706,7 +744,7 @@ export function groupChecksByStandard(checks) {
 }
 
 // Canonical standard identifiers accepted by --standard / -s.
-export const STANDARD_IDS = ['agentplugins', 'agentskills', 'anthropic', 'hermes', 'openagent', 'claude', 'codex'];
+export const STANDARD_IDS = ['agentplugins', 'agentskills', 'anthropic', 'hermes', 'multi-tool', 'openagent', 'claude', 'codex'];
 
 export const STANDARD_ALIASES = new Map([
   ['agentplugins', 'Agent Plugins 1.0.0'],
@@ -729,6 +767,10 @@ export const STANDARD_ALIASES = new Map([
   ['codex-cli', 'Codex (OpenAI)'],
   ['openai', 'Codex (OpenAI)'],
   ['openai-codex', 'Codex (OpenAI)'],
+  ['multi-tool', 'Multi-tool compatibility'],
+  ['multitool', 'Multi-tool compatibility'],
+  ['polyglot', 'Multi-tool compatibility'],
+  ['tools', 'Multi-tool compatibility'],
 ]);
 
 // Resolve a requested standard id/alias to its group label, or null if unknown.

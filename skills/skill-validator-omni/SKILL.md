@@ -1,6 +1,6 @@
 ---
-name: skill-validator
-description: Validates skills against authoring standards. Use to audit.
+name: skill-validator-omni
+description: Validates skills against seven authoring standards across all agents. Use to audit/certify.
 version: 2.5.0
 author: Adel Ben Yahia (adelpro)
 license: MIT
@@ -16,7 +16,7 @@ metadata:
 
 # Skill Validator
 
-The compliance gate for agent skills: validates a skill, a plugin, or a whole repo against seven standards in one command. Flagship: **Agent Plugins 1.0.0** (agent-plugins.org) — the open, vendor-neutral spec for packaging Agent Skills and MCP servers into portable plugins, published by a TSC of Core Maintainers from **Amazon, Cursor, Microsoft, OpenAI, and Vercel**. Also enforces the agentskills.io spec, Anthropic best practices, Hermes in-repo standard, OpenAgent skills.sh discoverability, Claude Code marketplace installability, and the OpenAI Codex skill format. Ships as `npx skill-validator-cli` (Node, zero Python deps) and as `scripts/validate.js` for local use.
+The compliance gate for agent skills: validates a skill, a plugin, or a whole repo against seven standards in one command. Flagship: **Agent Plugins 1.0.0** (agent-plugins.org) — the open, vendor-neutral spec for packaging Agent Skills and MCP servers into portable plugins, published by a TSC of Core Maintainers from **Amazon, Cursor, Microsoft, OpenAI, and Vercel**. Also enforces the agentskills.io spec, Anthropic best practices, Hermes in-repo standard, OpenAgent skills.sh discoverability, Claude Code marketplace installability, and the OpenAI Codex skill format. Ships as `npx skill-validator-omni` (Node, zero Python deps) and as `scripts/validate.js` for local use.
 
 This is a validation/audit tool. Creation/scaffolding is a secondary workflow — the differentiator is certifying that a skill will install and work across agents, not generating SKILL.md files.
 
@@ -37,7 +37,7 @@ This is a validation/audit tool. Creation/scaffolding is a secondary workflow �
 ## Prerequisites
 
 - Node.js >= 18 (runs `scripts/validate.js` or the npm CLI)
-- Published CLI: `npx skill-validator-cli <dir> [--json]` (fetched from npm; needs only Node)
+- Published CLI: `npx skill-validator-omni <dir> [--json]` (fetched from npm; needs only Node)
 - Local script: `node scripts/validate.js <dir>` (needs the `yaml` package — the repo's `npm install` covers it)
 
 ## What Gets Validated
@@ -69,9 +69,9 @@ A skill project passes install checks when it satisfies at least one discoverabl
 
 ## Procedure
 
-1. **Validate** — `npx skill-validator-cli <dir>` (or `node scripts/validate.js <dir>`). Read the PASS/FAIL report. Add `-s <standard>` to run one standard (repeatable; `--list-standards` shows names; `--all` is the default).
+1. **Validate** — `npx skill-validator-omni <dir>` (or `node scripts/validate.js <dir>`). Read the PASS/FAIL report. Add `-s <standard>` to run one standard (repeatable; `--list-standards` shows names; `--all` is the default).
 2. **Fix failures** — each check prints the offending detail; fix frontmatter/structure and re-run until exit 0.
-3. **CI gate** — `npx skill-validator-cli <dir> --json | jq -e '.ok'` (JSON report, exit 1 on failure).
+3. **CI gate** — `npx skill-validator-omni <dir> --json | jq -e '.ok'` (JSON report, exit 1 on failure).
 4. **Verify installability for publish** — `npx skills add <owner>/<repo> --list -y` must list your skills; for Claude, confirm the marketplace/plugin layouts above.
 5. **Scaffold (secondary)** — copy `references/frontmatter-template.md` into a new `SKILL.md`, fill fields, then validate from step 1.
 
@@ -79,7 +79,7 @@ A skill project passes install checks when it satisfies at least one discoverabl
 
 - **Validating a repo vs a single skill** — point at either; the tool discovers `skills/`, agent dirs, and plugin dirs automatically
 - **Skill with no `metadata.hermes`** — Hermes checks fail; that's correct if you publish outside Hermes, but the repo-level skill still gets spec + Anthropic + OpenAgent checks
-- **`yaml` package missing** — install deps: `npm install` in the skill-validator repo, or use the published CLI which bundles it
+- **`yaml` package missing** — install deps: `npm install` in the skill-validator-omni repo, or use the published CLI which bundles it
 - **Windows** — the npm CLI needs only Node (no python3 requirement)
 
 ## Pitfalls
@@ -87,15 +87,15 @@ A skill project passes install checks when it satisfies at least one discoverabl
 - Treating open-agent.io (the AFK-surf product site) as a standards source — it publishes NO skill spec. The real "open agent" standards are **agent-plugins.org** (Agent Plugins 1.0.0, vendor-neutral, Amazon/Cursor/Microsoft/OpenAI/Vercel) and **skills.sh** (schema at `schemas.agentskills.io`), both enforced by this validator
 - Confusing the Agent Plugins manifest with a Claude plugin manifest — Agent Plugins uses root `plugin.json` + `$schema: agent-plugins.org/schemas/1.0.0/plugin.schema.json` (closed field set); Claude uses `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json`. Both get checked
 - Claiming "installable" without the layout: `npx skills add` discovers root `SKILL.md`, `skills/`, or agent dirs — a skill buried in `examples/` is NOT discoverable; a Claude marketplace needs `.claude-plugin/marketplace.json`, not just plugin code
-- Letting the repo copy of `scripts/validate.js` drift from `github.com/adelpro/skill-validator/src/validate.js` — sync after changing either side
+- Letting the repo copy of `scripts/validate.js` drift from `github.com/adelpro/skill-validator-omni/src/validate.js` — sync after changing either side
 - Adding the progressive-disclosure requirement to tiny skills — it only applies above 200 lines
 - Expecting one SKILL.md to satisfy both Hermes and Codex frontmatter — Hermes requires `version`/`author`/`platforms`; Codex's closed field set (name/description/license/allowed-tools/metadata) rejects them. The standards conflict by design; the per-standard report shows which side a skill meets, so don't "fix" a Codex flag by deleting Hermes fields (and vice-versa)
 
 ## Verification
 
-- `npx skill-validator-cli <dir>` exits 0 with no failures on a compliant skill; report ends with per-standard scores (`[PASS] Agent Plugins 1.0.0: 7/7` etc.)
+- `npx skill-validator-omni <dir>` exits 0 with no failures on a compliant skill; report ends with per-standard scores (`[PASS] Agent Plugins 1.0.0: 7/7` etc.)
 - JSON mode carries a `standards` array (one object per standard: passed/failed/total/ok) for per-standard CI gating: `jq -e '.standards["Agent Plugins 1.0.0"].ok'`
 - `node scripts/validate.js <dir>` on this skill directory passes all checks except the Codex frontmatter restriction — expected: this is a Hermes-flavoured skill, and Hermes requires `version`/`author`/`platforms` fields that Codex's closed field set rejects. The conflict is per-standard by design; run `-s codex` vs `-s hermes` to see each side
-- Repo test suite green: `node --test` in `~/projects/skill-validator` (25 tests: spec, OpenAgent, well-known, Claude, Agent Plugins, Codex, fallback parser)
+- Repo test suite green: `node --test` in `~/projects/skill-validator-omni` (25 tests: spec, OpenAgent, well-known, Claude, Agent Plugins, Codex, fallback parser)
 - Broken cases proven: name mismatch → exit 1, invalid marketplace.json → FAIL, missing well-known `$schema` → FAIL, Agent Plugins bad name/missing `$schema`/unknown field → FAIL, Codex unexpected frontmatter field/angle-bracket description/ancillary docs → FAIL
-- `scripts/validate.js` matches `github.com/adelpro/skill-validator/src/validate.js`
+- `scripts/validate.js` matches `github.com/adelpro/skill-validator-omni/src/validate.js`

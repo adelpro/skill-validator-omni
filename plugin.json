@@ -6,8 +6,8 @@
   "author": {
     "name": "Adel Ben Yahia"
   },
-  "homepage": "https://github.com/adelpro/skill-validator",
-  "repository": "https://github.com/adelpro/skill-validator",
+  "homepage": "https://github.com/adelpro/skill-validator-omni",
+  "repository": "https://github.com/adelpro/skill-validator-omni",
   "license": "MIT",
   "keywords": ["skills", "validation", "agentskills", "agent-plugins", "cli"]
 }

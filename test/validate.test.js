@@ -17,7 +17,7 @@ metadata:
   version: 0.1.0
   hermes:
     tags: [demo]
-    related_skills: [skill-validator]
+    related_skills: [skill-validator-omni]
 ---
 # Demo Skill
 
@@ -406,6 +406,59 @@ test('filterChecksByStandard resolves aliases', async () => {
     const r = filterChecksByStandard(checks, ['spec', 'claude-code']);
     assert.ok(r.ok);
     assert.ok(r.checks.every((c) => c.name.includes('spec:') || c.name.includes('claude') || c.name === 'skills found'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('multi-tool: polyglot repo reports all install routes', async () => {
+  const root = await makeRepo({
+    'SKILL.md': GOOD_SKILL,
+    'plugin.json': JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      name: 'demo', version: '1.0.0',
+    }),
+    '.claude-plugin/marketplace.json': JSON.stringify({
+      name: 'mkt', plugins: [{ name: 'demo', source: { source: 'github', repo: 'a/demo' } }],
+    }),
+    'package.json': JSON.stringify({ name: 'demo-cli', bin: { 'demo-cli': 'bin.js' } }),
+  });
+  try {
+    const checks = await validate(root);
+    const mt = checks.filter((c) => c.name.startsWith('multi-tool:'));
+    assert.ok(mt.length > 0, 'multi-tool checks exist');
+    // report-only: every multi-tool check is ok even when a route is absent
+    assert.ok(mt.every((c) => c.ok), JSON.stringify(mt, null, 2));
+    assert.ok(mt.some((c) => c.name.includes('skills.sh') && c.detail === 'present'));
+    assert.ok(mt.some((c) => c.name.includes('npm CLI') && c.detail === 'present'));
+    assert.ok(mt.some((c) => c.name.includes('Agent Plugins') && c.detail === 'present'));
+    assert.ok(mt.some((c) => c.name.includes('Claude marketplace') && c.detail === 'present'));
+    const surfaces = mt.find((c) => c.name === 'multi-tool: install surfaces');
+    assert.ok(surfaces && /5 install route\(s\)/.test(surfaces.detail), surfaces && surfaces.detail);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('multi-tool: single-route skill stays green (report-only, never gates)', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    const mt = checks.filter((c) => c.name.startsWith('multi-tool:'));
+    assert.ok(mt.length > 0, 'multi-tool checks exist');
+    assert.ok(mt.every((c) => c.ok), 'report-only: must not fail a single-route skill — ' + JSON.stringify(mt, null, 2));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('filterChecksByStandard resolves multi-tool alias', async () => {
+  const root = await makeRepo({ 'SKILL.md': GOOD_SKILL });
+  try {
+    const checks = await validate(root);
+    const r = filterChecksByStandard(checks, ['polyglot']);
+    assert.ok(r.ok);
+    assert.ok(r.checks.some((c) => c.name.startsWith('multi-tool:')));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

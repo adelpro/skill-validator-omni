@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// skill-validator-cli — validate agent skills against multiple standards.
+// skill-validator-omni — validate agent skills against multiple standards.
 // Usage:
-//   skill-validator-cli <dir>                       human-readable report (exit 0 = pass)
-//   skill-validator-cli <dir> --json                machine-readable report for CI
-//   skill-validator-cli <dir> --standard hermes     run only one standard (repeatable)
-//   skill-validator-cli <dir> --all                 run every standard (the default)
-//   skill-validator-cli --list-standards
-//   skill-validator-cli --version
-//   skill-validator-cli --help
+//   skill-validator-omni <dir>                       human-readable report (exit 0 = pass)
+//   skill-validator-omni <dir> --json                machine-readable report for CI
+//   skill-validator-omni <dir> --standard hermes     run only one standard (repeatable)
+//   skill-validator-omni <dir> --all                 run every standard (the default)
+//   skill-validator-omni --list-standards
+//   skill-validator-omni --version
+//   skill-validator-omni --help
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,29 +42,29 @@ for (let i = 0; i < args.length; i += 1) {
 }
 
 if (listStandards) {
-  console.log(`skill-validator-cli ${pkg.version} — available standards:\n`);
+  console.log(`skill-validator-omni ${pkg.version} — available standards:\n`);
   for (const id of STANDARD_IDS) {
     console.log(`  ${id.padEnd(12)} ${resolveStandardLabel(id)}`);
   }
-  console.log('\nUse: skill-validator-cli <dir> --standard <name> (repeatable, e.g. -s hermes -s claude)');
+  console.log('\nUse: skill-validator-omni <dir> --standard <name> (repeatable, e.g. -s hermes -s claude)');
   process.exit(0);
 }
 
 if (help) {
-  console.log(`skill-validator-cli ${pkg.version}
+  console.log(`skill-validator-omni ${pkg.version}
 Validate agent skills against multiple standards:
   agentskills.io spec, Anthropic best practices, Hermes in-repo,
   OpenAgent skills.sh discoverability, Claude Code marketplaces,
   Agent Plugins 1.0.0, OpenAI Codex.
 
 Usage:
-  skill-validator-cli <dir>                  human report (exit 0 = all pass)
-  skill-validator-cli <dir> --json           JSON report for CI
-  skill-validator-cli <dir> --standard X     run only standard X (repeatable)
-  skill-validator-cli <dir> --all            run every standard (default)
-  skill-validator-cli --list-standards
-  skill-validator-cli --version
-  skill-validator-cli --help
+  skill-validator-omni <dir>                  human report (exit 0 = all pass)
+  skill-validator-omni <dir> --json           JSON report for CI
+  skill-validator-omni <dir> --standard X     run only standard X (repeatable)
+  skill-validator-omni <dir> --all            run every standard (default)
+  skill-validator-omni --list-standards
+  skill-validator-omni --version
+  skill-validator-omni --help
 `);
   process.exit(0);
 }
@@ -74,7 +74,7 @@ if (version) {
 }
 if (!dir) {
   console.error('error: missing <dir> argument');
-  console.error('usage: skill-validator-cli <dir> [--json] [--standard <name>|--all]');
+  console.error('usage: skill-validator-omni <dir> [--json] [--standard <name>|--all]');
   process.exit(2);
 }
 
@@ -105,7 +105,7 @@ const groups = groupChecksByStandard(checks);
 
 if (json) {
   const out = {
-    tool: 'skill-validator-cli',
+    tool: 'skill-validator-omni',
     version: pkg.version,
     target: dir,
     requested,

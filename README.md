@@ -1,4 +1,4 @@
-# skill-validator
+# skill-validator-omni
 
 One command validates an agent skill or plugin against every standard that gates whether it installs and works across agents. The flagship check is **Agent Plugins 1.0.0** (agent-plugins.org), the vendor-neutral spec for packaging Agent Skills and MCP servers into portable plugins, published by a Technical Steering Committee from Amazon, Cursor, Microsoft, OpenAI, and Vercel.
 
@@ -21,24 +21,24 @@ The repo is packaged for every install path at once. Pick the one for your agent
 **Claude Code**
 
 ```bash
-/plugin marketplace add adelpro/skill-validator
-/plugin install skill-validator@adelpro-skill-validator
+/plugin marketplace add adelpro/skill-validator-omni
+/plugin install skill-validator-omni@adelpro-skill-validator-omni
 ```
 
 **Any agent via the skills.sh CLI**
 
 ```bash
 # preview what's in the repo
-npx skills add adelpro/skill-validator -l
+npx skills add adelpro/skill-validator-omni -l
 
 # install into specific agents (claude-code, hermes-agent, codex, cursor, ...)
-npx skills add adelpro/skill-validator -a claude-code -a hermes-agent --copy -y
+npx skills add adelpro/skill-validator-omni -a claude-code -a hermes-agent --copy -y
 ```
 
 **Hermes Agent**
 
 ```bash
-npx skills add adelpro/skill-validator -s skill-validator -a hermes-agent --copy -y
+npx skills add adelpro/skill-validator-omni -s skill-validator-omni -a hermes-agent --copy -y
 ```
 
 **Agent Plugins clients**
@@ -48,21 +48,21 @@ The repo root is itself an Agent Plugins package (`plugin.json` with the canonic
 **The CLI itself (validation without installing the skill)**
 
 ```bash
-npx skill-validator-cli <dir>
-npm i -g skill-validator-cli   # optional global install
+npx skill-validator-omni <dir>
+npm i -g skill-validator-omni   # optional global install
 ```
 
 ## Usage
 
 ```bash
 # Human report. Exit 0 = all checks pass.
-npx skill-validator-cli ./my-skill
+npx skill-validator-omni ./my-skill
 
 # JSON report for CI pipelines.
-npx skill-validator-cli ./my-skill --json
+npx skill-validator-omni ./my-skill --json
 
 # Validate a whole repo. Discovers every skill under skills/ and agent dirs.
-npx skill-validator-cli ./my-skills-repo
+npx skill-validator-omni ./my-skills-repo
 ```
 
 ### Choosing standards
@@ -70,16 +70,16 @@ npx skill-validator-cli ./my-skills-repo
 By default every standard runs. To run only some:
 
 ```bash
-npx skill-validator-cli ./my-skill --standard hermes          # one standard
-npx skill-validator-cli ./my-skill -s hermes -s claude        # several (repeatable)
-npx skill-validator-cli ./my-skill --all                      # every standard (the default)
-npx skill-validator-cli --list-standards                      # valid names
+npx skill-validator-omni ./my-skill --standard hermes          # one standard
+npx skill-validator-omni ./my-skill -s hermes -s claude        # several (repeatable)
+npx skill-validator-omni ./my-skill --all                      # every standard (the default)
+npx skill-validator-omni --list-standards                      # valid names
 ```
 
 General checks (skill discovery) always run, so a filtered run still answers "is this even a valid skill layout?". The JSON report records what was requested:
 
 ```bash
-npx skill-validator-cli ./my-skill -s agentplugins --json | jq -r '.requested'
+npx skill-validator-omni ./my-skill -s agentplugins --json | jq -r '.requested'
 ```
 
 Unknown standard names exit with code 2 and print the valid names.
@@ -89,7 +89,7 @@ Unknown standard names exit with code 2 and print the valid names.
 The report ends with a per-standard breakdown. Each standard gets its own pass/fail count, so you see where a skill falls short without reading every check:
 
 ```bash
-$ npx skill-validator-cli ./my-skill
+$ npx skill-validator-omni ./my-skill
 34/34 checks passed
 Per standard:
   [PASS] agentskills.io: 6/6
@@ -104,7 +104,7 @@ Per standard:
 In JSON mode the same breakdown lives in `standards`, one object per standard with `passed`, `failed`, `total`, and `ok`. Gate CI on a single standard:
 
 ```bash
-npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
+npx skill-validator-omni . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
 ```
 
 ### Exit codes
@@ -119,7 +119,7 @@ npx skill-validator-cli . --json | jq -e '.standards["Agent Plugins 1.0.0"].ok'
 
 ```json
 {
-  "tool": "skill-validator-cli",
+  "tool": "skill-validator-omni",
   "version": "1.5.0",
   "target": "./my-skill",
   "passed": 27,
@@ -160,11 +160,11 @@ Every skill found in a repo gets the full check suite. A broken skill nested ins
 
 ```bash
 # A compliant skill
-$ npx skill-validator-cli ./my-skill
+$ npx skill-validator-omni ./my-skill
 27/27 checks passed
 
 # A broken one. Fails fast, tells you why.
-$ npx skill-validator-cli ./my-skill
+$ npx skill-validator-omni ./my-skill
   [FAIL] spec: name == directory  ('My-Skill' vs dir 'my-skill')
   [FAIL] hermes: description <= 60  (73 chars)
 1/27 checks passed
@@ -173,19 +173,19 @@ $ npx skill-validator-cli ./my-skill
 ## CI
 
 ```bash
-npx skill-validator-cli . --json | jq -e '.ok'
+npx skill-validator-omni . --json | jq -e '.ok'
 ```
 
 ## Layout
 
 ```
-skill-validator/
+skill-validator-omni/
 ├── bin/cli.js                  CLI entry
 ├── src/validate.js             the validator (library + standalone entry)
 ├── test/                       node --test suite
 ├── plugin.json                 Agent Plugins 1.0.0 manifest (self-validating)
 ├── .claude-plugin/             Claude Code marketplace + plugin manifests
-└── skills/skill-validator/     the Hermes skill (SKILL.md + scripts + references)
+└── skills/skill-validator-omni/     the Hermes skill (SKILL.md + scripts + references)
 ```
 
 ## Related

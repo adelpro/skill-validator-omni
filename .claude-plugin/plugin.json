@@ -1,5 +1,5 @@
 {
-  "name": "skill-validator",
+  "name": "skill-validator-omni",
   "description": "Multi-standard validator for agent skills (Agent Plugins 1.0.0, agentskills.io, Anthropic, Hermes, skills.sh, Claude Code)",
   "version": "1.4.0",
   "author": {

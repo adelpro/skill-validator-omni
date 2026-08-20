@@ -1,11 +1,11 @@
 {
-  "name": "skill-validator-cli",
+  "name": "skill-validator-omni",
   "version": "1.5.0",
   "description": "Validate agent skills against 7 standards (agentskills.io, Anthropic, Hermes, skills.sh, Claude Code, Agent Plugins, OpenAI Codex) in one command.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "skill-validator-cli": "bin/cli.js"
+    "skill-validator-omni": "bin/cli.js"
   },
   "main": "src/validate.js",
   "exports": {
@@ -37,12 +37,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adelpro/skill-validator.git"
+    "url": "git+https://github.com/adelpro/skill-validator-omni.git"
   },
   "bugs": {
-    "url": "https://github.com/adelpro/skill-validator/issues"
+    "url": "https://github.com/adelpro/skill-validator-omni/issues"
   },
-  "homepage": "https://github.com/adelpro/skill-validator#readme",
+  "homepage": "https://github.com/adelpro/skill-validator-omni#readme",
   "dependencies": {
     "yaml": "^2.9.0"
   }
