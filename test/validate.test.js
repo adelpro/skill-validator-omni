@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { validate, parseSimpleYaml, filterChecksByStandard } from '../src/validate.js';
+
+const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'validate.js');
 
 const GOOD_SKILL = `---
 name: demo-skill
@@ -462,4 +466,26 @@ test('filterChecksByStandard resolves multi-tool alias', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('the direct CLI runs through a shim, not only as node src/validate.js', async (t) => {
+  // A bin shim — `npx`, a global install, a link — reaches this file under another name, so an
+  // argv[1] comparison exits 0 having printed nothing. Silent success is the worst failure shape.
+  const dir = await mkdtemp(join(tmpdir(), 'svo-'));
+  const skill = join(dir, 'demo');
+  await mkdir(skill, { recursive: true });
+  await writeFile(join(skill, 'SKILL.md'), GOOD_SKILL);
+  const shim = join(dir, 'validator');
+  try {
+    await symlink(SRC, shim);
+  } catch (err) {
+    // Windows needs a privilege the runner may not hold; skipping is honest, passing is not.
+    return t.skip(`cannot create a symlink here: ${err.code}`);
+  }
+  const direct = spawnSync(process.execPath, [SRC, skill], { encoding: 'utf8' });
+  const throughShim = spawnSync(process.execPath, [shim, skill], { encoding: 'utf8' });
+  await rm(dir, { recursive: true, force: true });
+  assert.match(direct.stdout, /Validating:/, direct.stderr);
+  assert.match(throughShim.stdout, /Validating:/, throughShim.stderr);
+  assert.equal(throughShim.status, direct.status);
 });

@@ -7,6 +7,7 @@
 // (the Hermes skill keeps a synced copy under scripts/validate.js)
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
+import { isEntryPoint } from './is-entry-point.js';
 
 // Prefer the `yaml` package when resolvable; fall back to a built-in parser
 // for the SKILL.md frontmatter subset so the script runs with zero setup.
@@ -800,8 +801,10 @@ export function filterChecksByStandard(checks, requested) {
   return { ok: true, checks: kept };
 }
 
-// CLI entry when run directly: `node validate.js <dir>` (library otherwise)
-const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+// CLI entry when run directly: `node validate.js <dir>` (library otherwise). Not a name or URL
+// comparison: through a bin shim `argv[1]` is the command's own path, and that check would exit 0
+// in silence.
+const isMain = isEntryPoint(import.meta.url);
 if (isMain) {
   const dir = process.argv[2];
   if (!dir) {
